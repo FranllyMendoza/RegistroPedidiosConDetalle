@@ -1,0 +1,301 @@
+﻿@page "/rOrdenes"
+
+
+@using RegistroPedidiosConDetalle.BLL
+@using RegistroPedidiosConDetalle.Models
+@using Blazored.Toast.Services
+@using Blazored.Toast
+
+@inject IToastService Toast
+
+<EditForm Model="orden" OnValidSubmit="Guardar">
+    <DataAnnotationsValidator />
+
+    <div class="card">
+        <div class="container">
+            <div class="card-header">
+                <h3>Registro de Ordenes</h3>
+            </div>
+
+            <div class="card-body">
+                <form>
+                    <div class="form-group">
+                        <label> Orden Id:</label>
+                        <div class="input-group">
+                            <InputNumber @bind-Value="orden.OrdenId" class="form-control col-4" />
+                            <div class="input-group-append" display: inline-block>
+                                <button type="button" class="btn btn-primary input-group-text" @onclick="Buscar">
+                                    <i class="oi oi-magnifying-glass mr-2" /> Buscar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Fecha:</label>
+                        <InputDate @bind-Value="orden.Fecha" class="form-control" />
+                        <ValidationMessage For="@(() => orden.Fecha)" />
+                    </div>
+
+                    <div class="form-group">
+                        <label>Suplidor:</label>
+                        <select @bind="SuplidorSeleccionado" class="form-control" @onclick="DevolverSuplidor">
+                            <option value="0" disabled selected>Seleccione un suplidor</option>
+                            @foreach (var item in ListaSuplidores)
+                            {
+                                <option value="@item.SuplidorId">@item.Nombres</option>
+                            }
+                        </select>
+                        <p />
+                        <label>Producto:</label>
+                        <select @bind="ProductoSeleccionado" class="form-control" @onclick="DevolverCantidadCosto">
+                            <option value="0" disabled selected>Seleccione un producto</option>
+                            @foreach (var item in ListaProductos)
+                            {
+                                <option value="@item.ProductoId">@item.Descripcion</option>
+                            }
+                        </select>
+                        <p />
+                        <div class="input-group">
+                            <table class="table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Cantidad:</th>
+                                        <th>Costo:</th>
+                                        <th> </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><InputNumber @bind-Value="CantidadP" class="form-control col-4" /></td>
+                                        <td><InputNumber @bind-Value="CostoP" class="form-control col-4" /></td>
+                                        <td>
+                                            <div class="input-group-append" display: inline-block>
+                                                <button type="button" class="btn btn-primary input-group-text" @onclick="Agregar">
+                                                    <i class="oi oi-plus mr-2" /> Agregar
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive text-nowrap" style="position: relative; height:200px; overflow: auto; display: block;">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Cantidad:</th>
+                                    <th>Descripción:</th>
+                                    <th>Costo:</th>
+                                    <th>SubTotal:</th>
+                                </tr>
+                            </thead>
+
+                            <tbody class="text-body">
+                                @foreach (var item in ListaDetalle)
+                                {
+                                    <tr>
+                                        <td>@item.Cantidad</td>
+                                        <td>@ProductosBLL.Buscar(item.ProductoId).Descripcion</td>
+                                        <td>@item.Costo</td>
+                                        <td>@CalcularSubtotal(item.Costo, item.Cantidad)</td>
+                                        <td>
+                                            <button class="btn btn-danger" type="button" @onclick="(() => Remover(item.Id))">
+                                                <i class="oi oi-x" />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                    <label class="form-control">Monto Total: @orden.Monto</label>
+                </form>
+            </div>
+
+            <div class="card-footer">
+                <div class="form-group text-center" display: inline-block>
+                    <button type="button" class="btn btn-lg btn-primary" @onclick="Nuevo">
+                        <i class="oi oi-file mr-2" />Nuevo
+                    </button>
+                    <button type="submit" class="btn btn-lg btn-success">
+                        <i class="oi oi-account-login" style="transform:rotate(90deg)" /> Guardar
+                    </button>
+                    <button type="button" class="btn btn-lg btn-danger" @onclick="Eliminar">
+                        <i class="oi oi-trash mr-2" />Eliminar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</EditForm>
+
+@code
+{
+    private Ordenes orden = new Ordenes();
+
+    public int SuplidorSeleccionado { get; set; }
+    List<Suplidores> ListaSuplidores = new List<Suplidores>();
+    Suplidores suplidor = new Suplidores();
+
+    public int ProductoSeleccionado { get; set; }
+    List<Productos> ListaProductos = new List<Productos>();
+    Productos producto = new Productos();
+
+    public float CantidadP { get; set; }
+    public float CostoP { get; set; }
+
+    List<OrdenesDetalle> ListaDetalle = new List<OrdenesDetalle>();
+
+    protected override void OnInitialized()
+    {
+        Nuevo();
+    }
+
+    public void Nuevo()
+    {
+        orden = new Ordenes();
+
+        SuplidorSeleccionado = 0;
+        ListaSuplidores = SuplidoresBLL.GetList();
+
+        ProductoSeleccionado = 0;
+        ListaProductos = ProductosBLL.GetList();
+
+        ListaDetalle = new List<OrdenesDetalle>();
+    }
+
+    private void Actualizar()
+    {
+        ProductoSeleccionado = 0;
+        CantidadP = CostoP = 0;
+    }
+    public void Buscar()
+    {
+        if (orden.OrdenId > 0)
+        {
+            var Orden = OrdenesBLL.Buscar(orden.OrdenId);
+
+            if (Orden != null)
+            {
+                this.orden = Orden;
+                ListaDetalle = Orden.Detalle;
+                SuplidorSeleccionado = orden.SuplidorId;
+            }
+            else
+            {
+                Toast.ShowInfo("Orden no encontrada");
+                Nuevo();
+            }
+        }
+        else
+            Toast.ShowWarning("Debe ingresar un Id para buscar");
+    }
+    public bool existeOrden()
+    {
+        bool existe = false;
+
+        foreach (var item in ListaDetalle)
+        {
+            if (item.ProductoId == ProductoSeleccionado)
+            {
+                return existe = true;
+            }
+            else
+                existe = false;
+        }
+        return existe;
+    }
+
+    public void Agregar()
+    {
+        if (ProductoSeleccionado == 0)
+            return;
+        bool existe = existeOrden();
+        bool validado = ValidarAgregar();
+        if (existe == false)
+        {
+            if (!validado)
+                return;
+            ListaDetalle.Add(new OrdenesDetalle { OrdenId = orden.OrdenId, ProductoId = ProductoSeleccionado, Costo = CostoP, Cantidad = CantidadP });
+            orden.Monto += CantidadP * CostoP;
+            Actualizar();
+        }
+        else
+            Toast.ShowError("El produto ya se encuentra en la lista");
+    }
+    public void Remover(int id)
+    {
+        var detalleRemover = ListaDetalle.Find(d => d.Id == id);
+        orden.Monto -= detalleRemover.Cantidad * detalleRemover.Costo;
+        ListaDetalle.Remove(detalleRemover);
+    }
+
+    public void Guardar()
+    {
+        bool Guardado;
+        if (ListaDetalle.Count < 1)
+            Toast.ShowError("No fue posible guardar, debe tener elementos en la lista o eliminar la orden");
+        else
+        {
+
+            orden.Detalle = ListaDetalle;
+            Guardado = OrdenesBLL.Guardar(orden);
+
+            if (Guardado)
+            {
+                Nuevo();
+                Toast.ShowSuccess("Guardado correctamente");
+            }
+            else
+                Toast.ShowError("No fue posible guardar");
+        }
+
+    }
+
+    public void Eliminar()
+    {
+        bool Eliminado = false;
+        Eliminado = OrdenesBLL.Eliminar(this.orden.OrdenId);
+        if (Eliminado)
+        {
+            Nuevo();
+            Toast.ShowSuccess("Eliminado correctamente");
+        }
+        else
+            Toast.ShowError("No fue posible eliminar");
+    }
+    public float CalcularSubtotal(float cantidad, float costo)
+    {
+        return cantidad * costo;
+    }
+    public void DevolverCantidadCosto()
+    {
+        if (ProductosBLL.Buscar(ProductoSeleccionado) != null)
+            CostoP = ProductosBLL.Buscar(ProductoSeleccionado).Costo;
+    }
+    public void DevolverSuplidor()
+    {
+        orden.SuplidorId = SuplidorSeleccionado;
+    }
+    public bool ValidarAgregar()
+    {
+        var producto = ProductosBLL.Buscar(ProductoSeleccionado);
+        if (CantidadP > producto.Inventario)
+        {
+            Toast.ShowError("No existe cantidad suficiente en el inventario");
+            CantidadP = producto.Inventario;
+            return false;
+        }
+        else if (CantidadP < 0 || CostoP < 0)
+        {
+            Toast.ShowError("No puede usar cantidades negativas");
+            return false;
+        }
+        else
+            return true;
+    }
+
+}
